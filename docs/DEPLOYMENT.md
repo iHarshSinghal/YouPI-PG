@@ -118,3 +118,23 @@ Vercel Services is currently beta. The native deployment still remains the
 recommended production target for the SQLite-backed gateway and its long-lived
 observer processes; a Vercel deployment must use a persistent database and
 separate worker strategy before handling production payment traffic.
+
+## VPS with Docker Compose + Cloudflare Tunnel
+
+```bash
+cp .env.example .env   # set CLOUDFLARE_DOMAIN, CLOUDFLARE_TUNNEL_TOKEN and the secrets
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+No host ports are published; traffic arrives only through the `cloudflared` sidecar.
+Configure the tunnel's public hostnames (service URLs use the compose network):
+
+| Hostname | Service URL |
+| :-- | :-- |
+| `pay.<domain>` | `http://gateway:7000` |
+| `pay-api.<domain>` | `http://gateway:6100` |
+| `pay-admin.<domain>` | `http://gateway:6001` |
+| `pay-gmail.<domain>` | `http://gateway:6003` |
+
+Do not expose the Control Center (8090) or the SMS observer (6002) publicly unless required.
+SQLite lives in the `youpi-data` volume; back it up regularly (`docker run --rm -v youpi-data:/d -v $PWD:/b alpine tar czf /b/youpi-data.tgz -C /d .`).

@@ -1,0 +1,33 @@
+# =============================================================================
+# YOUPI PG V2 — Production override for a VPS behind a Cloudflare Tunnel
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# No service port is published on the host. All public traffic enters through the
+# `cloudflared` sidecar (outbound-only tunnel), so Docker port publishing can never
+# bypass the host firewall. Secrets come from .env (never committed).
+# Required in .env: CLOUDFLARE_DOMAIN, CLOUDFLARE_TUNNEL_TOKEN
+# =============================================================================
+
+services:
+  gateway:
+    ports: !reset []
+    environment:
+      YOUPI_MODE: production
+      YOUPI_ALLOW_LOCALHOST_MODE: "false"
+      CLOUDFLARE_DOMAIN: ${CLOUDFLARE_DOMAIN:?set CLOUDFLARE_DOMAIN in .env}
+      DEPLOYMENT_PREFIX: ${DEPLOYMENT_PREFIX:-pay}
+      BASE_PAYMENT_API_URL: https://${DEPLOYMENT_PREFIX:-pay}-api.${CLOUDFLARE_DOMAIN}
+      BASE_CHECKOUT_URL: https://${DEPLOYMENT_PREFIX:-pay}.${CLOUDFLARE_DOMAIN}
+      BASE_ADMIN_URL: https://${DEPLOYMENT_PREFIX:-pay}-admin.${CLOUDFLARE_DOMAIN}
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: youpi-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      gateway:
+        condition: service_healthy
