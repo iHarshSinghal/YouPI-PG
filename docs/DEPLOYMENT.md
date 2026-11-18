@@ -119,22 +119,26 @@ recommended production target for the SQLite-backed gateway and its long-lived
 observer processes; a Vercel deployment must use a persistent database and
 separate worker strategy before handling production payment traffic.
 
-## VPS with Docker Compose + Cloudflare Tunnel
+## VPS with Docker Compose + Caddy
 
 ```bash
-cp .env.example .env   # set CLOUDFLARE_DOMAIN, CLOUDFLARE_TUNNEL_TOKEN and the secrets
+cp .env.example .env   # set CLOUDFLARE_DOMAIN and the secrets
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-No host ports are published; traffic arrives only through the `cloudflared` sidecar.
-Configure the tunnel's public hostnames (service URLs use the compose network):
+Ports are published on `127.0.0.1` only. Create DNS A records for `pay`, `pay-api`,
+`pay-admin` and `pay-gmail` pointing at the VPS IP, then add to your Caddyfile
+(replace `example.com`):
 
-| Hostname | Service URL |
-| :-- | :-- |
-| `pay.<domain>` | `http://gateway:7000` |
-| `pay-api.<domain>` | `http://gateway:6100` |
-| `pay-admin.<domain>` | `http://gateway:6001` |
-| `pay-gmail.<domain>` | `http://gateway:6003` |
+```caddyfile
+pay.example.com       { reverse_proxy 127.0.0.1:7000 }
+pay-api.example.com   { reverse_proxy 127.0.0.1:6100 }
+pay-admin.example.com { reverse_proxy 127.0.0.1:6001 }
+pay-gmail.example.com { reverse_proxy 127.0.0.1:6003 }
+```
 
-Do not expose the Control Center (8090) or the SMS observer (6002) publicly unless required.
-SQLite lives in the `youpi-data` volume; back it up regularly (`docker run --rm -v youpi-data:/d -v $PWD:/b alpine tar czf /b/youpi-data.tgz -C /d .`).
+If Caddy itself runs in Docker, use the host gateway (e.g. `host.docker.internal:7000`)
+or attach it to the compose network instead of `127.0.0.1`.
+Never proxy the Control Center (8090) publicly. SQLite lives in the `youpi-data`
+volume; back it up regularly
+(`docker run --rm -v youpi-data:/d -v $PWD:/b alpine tar czf /b/youpi-data.tgz -C /d .`).
