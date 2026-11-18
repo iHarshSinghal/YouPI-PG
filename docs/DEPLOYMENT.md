@@ -118,3 +118,27 @@ Vercel Services is currently beta. The native deployment still remains the
 recommended production target for the SQLite-backed gateway and its long-lived
 observer processes; a Vercel deployment must use a persistent database and
 separate worker strategy before handling production payment traffic.
+
+## VPS with Docker Compose + Caddy
+
+```bash
+cp .env.example .env   # set CLOUDFLARE_DOMAIN and the secrets
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Ports are published on `127.0.0.1` only. Create DNS A records for `pay`, `pay-api`,
+`pay-admin` and `pay-gmail` pointing at the VPS IP, then add to your Caddyfile
+(replace `example.com`):
+
+```caddyfile
+pay.example.com       { reverse_proxy 127.0.0.1:7000 }
+pay-api.example.com   { reverse_proxy 127.0.0.1:6100 }
+pay-admin.example.com { reverse_proxy 127.0.0.1:6001 }
+pay-gmail.example.com { reverse_proxy 127.0.0.1:6003 }
+```
+
+If Caddy itself runs in Docker, use the host gateway (e.g. `host.docker.internal:7000`)
+or attach it to the compose network instead of `127.0.0.1`.
+Never proxy the Control Center (8090) publicly. SQLite lives in the `youpi-data`
+volume; back it up regularly
+(`docker run --rm -v youpi-data:/d -v $PWD:/b alpine tar czf /b/youpi-data.tgz -C /d .`).

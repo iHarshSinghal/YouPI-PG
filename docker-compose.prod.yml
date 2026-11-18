@@ -1,0 +1,27 @@
+# =============================================================================
+# YOUPI PG V2 — Production override for a VPS behind Caddy (reverse proxy)
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Service ports are published on the host LOOPBACK only (127.0.0.1), so they are
+# unreachable from the internet. Caddy on the host terminates TLS and proxies to them.
+# Secrets come from .env (never committed). Required in .env: CLOUDFLARE_DOMAIN
+# =============================================================================
+
+services:
+  gateway:
+    ports: !override
+      - "127.0.0.1:7000:7000"   # Checkout Portal      -> pay.<domain>
+      - "127.0.0.1:6100:6100"   # Payment API          -> pay-api.<domain>
+      - "127.0.0.1:6001:6001"   # Merchant Admin       -> pay-admin.<domain>
+      - "127.0.0.1:6003:6003"   # Gmail Observer       -> pay-gmail.<domain>
+      - "127.0.0.1:6002:6002"   # SMS Observer (private; Android app via API host)
+      - "127.0.0.1:8090:8090"   # Control Center (private, never proxy publicly)
+    environment:
+      YOUPI_MODE: production
+      YOUPI_ALLOW_LOCALHOST_MODE: "false"
+      CLOUDFLARE_DOMAIN: ${CLOUDFLARE_DOMAIN:?set CLOUDFLARE_DOMAIN in .env}
+      DEPLOYMENT_PREFIX: ${DEPLOYMENT_PREFIX:-pay}
+      BASE_PAYMENT_API_URL: https://${DEPLOYMENT_PREFIX:-pay}-api.${CLOUDFLARE_DOMAIN}
+      BASE_CHECKOUT_URL: https://${DEPLOYMENT_PREFIX:-pay}.${CLOUDFLARE_DOMAIN}
+      BASE_ADMIN_URL: https://${DEPLOYMENT_PREFIX:-pay}-admin.${CLOUDFLARE_DOMAIN}
